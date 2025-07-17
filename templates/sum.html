@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Arbeitszeit Summe - PDF</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    .signature-box {
+      border: 1px solid #ccc;
+      height: 100px;
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-style: italic;
+      color: #777;
+    }
+    @media print {
+      button {
+        display: none !important;
+      }
+      select {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container my-5" id="pdf-content">
+  <h1 class="text-center mb-4">⌛ Gearbeitete Gesamtzeit</h1>
+
+  <form method="GET" action="{{ url_for('sum_page') }}" class="mb-4 d-flex justify-content-center gap-3 align-items-center flex-wrap">
+    <label for="monthSelect" class="form-label mb-0 fw-bold">Monat wählen:</label>
+    <input type="month" id="monthSelect" name="month" value="{{ selected_month }}" class="form-control" style="max-width: 200px;">
+    <button type="submit" class="btn btn-primary">Anzeigen</button>
+  </form>
+
+  <p class="fs-5 text-center mb-4">
+    Insgesamt gearbeitet: <strong>{{ hours }}</strong> Stunden und <strong>{{ minutes }}</strong> Minuten
+  </p>
+
+  <div class="table-responsive">
+    <table class="table table-striped table-bordered text-center align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Datum</th>
+          <th>Arbeitszeit</th>
+          <th>Pause</th>
+          <th>Nettozeit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in daily_entries %}
+        <tr>
+          <td>{{ row.date }}</td>
+          <td>{{ row.work_duration }}</td>
+          <td>{{ row.break_duration }}</td>
+          <td>{{ row.netto_duration }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">Keine Einträge für diesen Monat.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th>Gesamt</th>
+          <th>{{ total_work }}</th>
+          <th>{{ total_break }}</th>
+          <th>{{ total_netto }}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="row justify-content-around mt-5">
+    <div class="col-md-5 col-12 mb-4">
+      <label for="employeeSignature" class="form-label fw-bold">Unterschrift Mitarbeiter</label>
+      <div class="signature-box" id="employeeSignature"></div>
+    </div>
+    <div class="col-md-5 col-12 mb-4">
+      <label for="employerSignature" class="form-label fw-bold">Unterschrift Arbeitgeber</label>
+      <div class="signature-box" id="employerSignature"></div>
+    </div>
+  </div>
+</div>
+
+<div class="text-center mb-5">
+  <button class="btn btn-primary" id="downloadPdfBtn">PDF herunterladen</button>
+  <a href="/" class="btn btn-secondary ms-2">Zurück zum Kalender</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+    const element = document.getElementById('pdf-content');
+    const opt = {
+      margin:       0.5,
+      filename:     'Arbeitszeit_Summe.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+  });
+</script>
+<footer style="text-align:center; padding: 1rem 0; background:#f1f1f1; width: 100%; margin-top: 2rem;">
+  <a href="https://mxsa69.github.io/sankar/" target="_blank" style="text-decoration:none; color:#333; font-weight:600;">Sankar Solutions</a>
+</footer>
+</body>
+</html>

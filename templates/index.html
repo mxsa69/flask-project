@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arbeitskalender</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    #calendar {
+      max-width: 900px;
+      margin: 40px auto;
+    }
+    .fc-daygrid-day.fc-day-today {
+      background-color: #0d6efd !important;
+      color: white !important;
+    }
+    #entryModal, #modalBackdrop {
+      display: none;
+    }
+    #entryModal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      padding: 20px;
+      z-index: 1050;
+      width: 360px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #modalBackdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 1040;
+    }
+    small.text-muted {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1 class="text-center my-4">🗓️ Arbeitskalender</h1>
+  
+  <div class="d-flex justify-content-end mb-3 gap-2">
+    <a href="/sum" class="btn btn-outline-info">Summe</a>
+    <a href="/logout" class="btn btn-outline-danger">Logout</a>
+  </div>
+
+  <div id="calendar"></div>
+
+  <div id="modalBackdrop"></div>
+  <div id="entryModal" aria-modal="true" role="dialog" aria-labelledby="modalTitle">
+    <h5 id="modalTitle" class="mb-3">Arbeitszeit erfassen für <span id="selectedDate"></span></h5>
+
+    <ul class="nav nav-tabs mb-3" id="modeTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab" aria-controls="manual" aria-selected="true">Manuell</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="auto-tab" data-bs-toggle="tab" data-bs-target="#auto" type="button" role="tab" aria-controls="auto" aria-selected="false">Automatisch</button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="tabContent">
+
+      <!-- Manuell Eingeben -->
+      <div class="tab-pane fade show active" id="manual" role="tabpanel" aria-labelledby="manual-tab">
+        <div class="mb-3">
+          <label for="manualStart" class="form-label">Startzeit</label>
+          <input type="time" id="manualStart" class="form-control" required />
+          <small id="manualStartDisplay" class="text-muted">Startzeit: –</small>
+        </div>
+        <div class="mb-3">
+          <label for="manualEnd" class="form-label">Endzeit</label>
+          <input type="time" id="manualEnd" class="form-control" required />
+          <small id="manualEndDisplay" class="text-muted">Endzeit: –</small>
+        </div>
+        <div class="mb-3">
+          <label for="manualBreakStart" class="form-label">Pause Start</label>
+          <input type="time" id="manualBreakStart" class="form-control" required />
+          <small id="manualBreakStartDisplay" class="text-muted">Pause Start: –</small>
+        </div>
+        <div class="mb-3">
+          <label for="manualBreakEnd" class="form-label">Pause Ende</label>
+          <input type="time" id="manualBreakEnd" class="form-control" required />
+          <small id="manualBreakEndDisplay" class="text-muted">Pause Ende: –</small>
+        </div>
+        <button type="button" class="btn btn-primary w-100" id="manualSaveBtn">Speichern</button>
+      </div>
+
+      <!-- Automatisch (Timer) -->
+      <div class="tab-pane fade" id="auto" role="tabpanel" aria-labelledby="auto-tab">
+        <button id="startWorkBtn" class="btn btn-success w-100 mb-2">▶️ Start Arbeit</button>
+        <button id="startBreakBtn" class="btn btn-warning w-100 mb-2" disabled>☕ Pause Start</button>
+        <button id="endBreakBtn" class="btn btn-info w-100 mb-2" disabled>⏯ Pause Ende</button>
+        <button id="stopWorkBtn" class="btn btn-danger w-100 mb-2" disabled>⏹ Stop Arbeit</button>
+        <div>
+          <p><strong>Startzeit:</strong> <span id="displayStart">–</span></p>
+          <p><strong>Pause:</strong> <span id="displayBreak">–</span></p>
+          <p><strong>Endzeit:</strong> <span id="displayEnd">–</span></p>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+    <h6>Gespeicherte Einträge für <span id="listDate"></span>:</h6>
+    <ul id="entryList" class="list-group mb-3"></ul>
+
+    <div class="d-flex justify-content-between">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+
+    // Einträge aus localStorage (später API ersetzen)
+    let entries = JSON.parse(localStorage.getItem('entries') || '{}');
+
+    // Events fürs Kalender markieren
+    const createEvents = () =>
+      Object.keys(entries).map((date) => ({
+        title: '✅',
+        start: date,
+        allDay: true,
+        display: 'auto',
+        color: '#28a745',
+        extendedProps: { description: 'Arbeitszeit eingetragen' },
+      }));
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prevYear,prev,next,nextYear today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay',
+      },
+      selectable: true,
+      events: createEvents(),
+      eventDidMount: (info) => {
+        info.el.setAttribute('title', info.event.extendedProps.description);
+      },
+      dateClick: function (info) {
+        const date = info.dateStr;
+        document.getElementById('selectedDate').textContent = date;
+        document.getElementById('listDate').textContent = date;
+        loadEntriesForDate(date);
+        openModal();
+      },
+    });
+
+    calendar.render();
+
+    // Live Input Felder & Anzeige
+    const manualStart = document.getElementById('manualStart');
+    const manualEnd = document.getElementById('manualEnd');
+    const manualBreakStart = document.getElementById('manualBreakStart');
+    const manualBreakEnd = document.getElementById('manualBreakEnd');
+
+    const manualStartDisplay = document.getElementById('manualStartDisplay');
+    const manualEndDisplay = document.getElementById('manualEndDisplay');
+    const manualBreakStartDisplay = document.getElementById('manualBreakStartDisplay');
+    const manualBreakEndDisplay = document.getElementById('manualBreakEndDisplay');
+
+    manualStart.addEventListener('input', () => {
+      manualStartDisplay.textContent = 'Startzeit: ' + (manualStart.value || '–');
+    });
+    manualEnd.addEventListener('input', () => {
+      manualEndDisplay.textContent = 'Endzeit: ' + (manualEnd.value || '–');
+    });
+    manualBreakStart.addEventListener('input', () => {
+      manualBreakStartDisplay.textContent = 'Pause Start: ' + (manualBreakStart.value || '–');
+    });
+    manualBreakEnd.addEventListener('input', () => {
+      manualBreakEndDisplay.textContent = 'Pause Ende: ' + (manualBreakEnd.value || '–');
+    });
+
+    // Manuell speichern
+    document.getElementById('manualSaveBtn').onclick = () => {
+      const date = document.getElementById('selectedDate').textContent;
+      const start = manualStart.value;
+      const end = manualEnd.value;
+      const breakStart = manualBreakStart.value;
+      const breakEnd = manualBreakEnd.value;
+
+      if (!start || !end || !breakStart || !breakEnd) {
+        alert('Bitte alle Zeiten ausfüllen.');
+        return;
+      }
+
+      entries[date] = { start, end, breakStart, breakEnd };
+      localStorage.setItem('entries', JSON.stringify(entries));
+      alert('✅ Eintrag gespeichert!');
+      loadEntriesForDate(date);
+      refreshCalendar();
+    };
+
+    // Timer Buttons & Anzeige (auto)
+    let startTime = null;
+    let breakStartTime = null;
+    let breakEndTime = null;
+    let endTime = null;
+
+    const startWorkBtn = document.getElementById('startWorkBtn');
+    const startBreakBtn = document.getElementById('startBreakBtn');
+    const endBreakBtn = document.getElementById('endBreakBtn');
+    const stopWorkBtn = document.getElementById('stopWorkBtn');
+
+    const displayStart = document.getElementById('displayStart');
+    const displayBreak = document.getElementById('displayBreak');
+    const displayEnd = document.getElementById('displayEnd');
+
+    function formatTime(date) {
+      return date.toTimeString().slice(0, 5);
+    }
+
+    startWorkBtn.onclick = () => {
+      startTime = new Date();
+      displayStart.textContent = formatTime(startTime);
+      startWorkBtn.disabled = true;
+      startBreakBtn.disabled = false;
+      endBreakBtn.disabled = true;
+      stopWorkBtn.disabled = false;
+    };
+
+    startBreakBtn.onclick = () => {
+      breakStartTime = new Date();
+      displayBreak.textContent = `${formatTime(breakStartTime)} – ...`;
+      startBreakBtn.disabled = true;
+      endBreakBtn.disabled = false;
+      stopWorkBtn.disabled = true;
+    };
+
+    endBreakBtn.onclick = () => {
+      breakEndTime = new Date();
+      displayBreak.textContent = `${formatTime(breakStartTime)} – ${formatTime(breakEndTime)}`;
+      startBreakBtn.disabled = false;
+      endBreakBtn.disabled = true;
+      stopWorkBtn.disabled = false;
+    };
+
+    stopWorkBtn.onclick = () => {
+      endTime = new Date();
+      displayEnd.textContent = formatTime(endTime);
+      startBreakBtn.disabled = true;
+      endBreakBtn.disabled = true;
+      stopWorkBtn.disabled = true;
+
+      saveRecordedEntry();
+    };
+
+    function saveRecordedEntry() {
+      const date = document.getElementById('selectedDate').textContent;
+      if (!startTime || !endTime) {
+        alert('Start- und Endzeit müssen gesetzt sein.');
+        return;
+      }
+      if (!breakStartTime) breakStartTime = startTime;
+      if (!breakEndTime) breakEndTime = breakStartTime;
+
+      const startStr = formatTime(startTime);
+      const endStr = formatTime(endTime);
+      const breakStartStr = formatTime(breakStartTime);
+      const breakEndStr = formatTime(breakEndTime);
+
+      entries[date] = { start: startStr, end: endStr, breakStart: breakStartStr, breakEnd: breakEndStr };
+      localStorage.setItem('entries', JSON.stringify(entries));
+      alert('✅ Arbeitstag gespeichert!');
+      loadEntriesForDate(date);
+      refreshCalendar();
+      resetTimer();
+    }
+
+    function resetTimer() {
+      startTime = null;
+      breakStartTime = null;
+      breakEndTime = null;
+      endTime = null;
+
+      displayStart.textContent = '–';
+      displayBreak.textContent = '–';
+      displayEnd.textContent = '–';
+
+      startWorkBtn.disabled = false;
+      startBreakBtn.disabled = true;
+      endBreakBtn.disabled = true;
+      stopWorkBtn.disabled = true;
+    }
+
+    // Gespeicherte Einträge für den Tag laden und anzeigen + löschen Button
+    const entryList = document.getElementById('entryList');
+    function loadEntriesForDate(date) {
+      entryList.innerHTML = '';
+      if (!entries[date]) {
+        entryList.innerHTML = '<li class="list-group-item">Keine Einträge für diesen Tag.</li>';
+        return;
+      }
+      const e = entries[date];
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+      li.innerHTML = `
+        Start: <span class="fw-semibold">${e.start}</span>,
+        Pause: <span class="fw-semibold">${e.breakStart} - ${e.breakEnd}</span>,
+        Ende: <span class="fw-semibold">${e.end}</span>
+        <button class="btn btn-sm btn-outline-danger">Löschen</button>
+      `;
+
+      li.querySelector('button').onclick = () => {
+        if (confirm('Eintrag wirklich löschen?')) {
+          delete entries[date];
+          localStorage.setItem('entries', JSON.stringify(entries));
+          loadEntriesForDate(date);
+          refreshCalendar();
+        }
+      };
+
+      entryList.appendChild(li);
+    }
+
+    // Kalender aktualisieren, wenn Einträge sich ändern
+    function refreshCalendar() {
+      calendar.removeAllEvents();
+      createEvents().forEach((event) => calendar.addEvent(event));
+    }
+
+    // Modal öffnen / schließen
+    window.openModal = function () {
+      document.getElementById('entryModal').style.display = 'block';
+      document.getElementById('modalBackdrop').style.display = 'block';
+    };
+
+    window.closeModal = function () {
+      document.getElementById('entryModal').style.display = 'none';
+      document.getElementById('modalBackdrop').style.display = 'none';
+      resetAll();
+    };
+
+    // Alles zurücksetzen (Modal + Inputs + Timer)
+    function resetAll() {
+      resetTimer();
+      manualStart.value = '';
+      manualEnd.value = '';
+      manualBreakStart.value = '';
+      manualBreakEnd.value = '';
+
+      manualStartDisplay.textContent = 'Startzeit: –';
+      manualEndDisplay.textContent = 'Endzeit: –';
+      manualBreakStartDisplay.textContent = 'Pause Start: –';
+      manualBreakEndDisplay.textContent = 'Pause Ende: –';
+
+      entryList.innerHTML = '';
+      document.getElementById('selectedDate').textContent = '';
+      document.getElementById('listDate').textContent = '';
+    }
+  });
+</script>
+<footer style="text-align:center; padding: 1rem 0; background:#f1f1f1; width: 100%; margin-top: 2rem;">
+  <a href="https://mxsa69.github.io/sankar/" target="_blank" style="text-decoration:none; color:#333; font-weight:600;">Sankar Solutions</a>
+</footer>
+</body>
+</html>
