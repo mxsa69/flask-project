@@ -124,6 +124,12 @@ def sum_page():
             ORDER BY date
         ''', (session['user_id'], first_day.strftime('%Y-%m-%d'), last_day.strftime('%Y-%m-%d'))).fetchall()
 
+        # Debug-Ausgabe im Terminal
+        print(f"User ID: {session['user_id']}")
+        print(f"Gefundene Einträge für {month_str}: {len(rows)}")
+        for r in rows:
+            print(dict(r))
+
     daily_entries = []
     total_work_minutes = 0
     total_break_minutes = 0
@@ -150,7 +156,8 @@ def sum_page():
                 'break_duration': f"{int(break_duration // 60)}h {int(break_duration % 60)}m",
                 'netto_duration': f"{int(netto_duration // 60)}h {int(netto_duration % 60)}m",
             })
-        except:
+        except Exception as e:
+            print(f"Fehler bei Eintrag {row['date']}: {e}")
             pass
 
     def fmt_time(total_minutes):
