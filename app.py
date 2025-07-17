@@ -3,6 +3,7 @@ import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from calendar import monthrange
+import os
 
 app = Flask(__name__)
 app.secret_key = 'supersecret'
@@ -150,7 +151,6 @@ def sum_page():
                 'netto_duration': f"{int(netto_duration // 60)}h {int(netto_duration % 60)}m",
             })
         except:
-            # falls ungültige Zeiten
             pass
 
     def fmt_time(total_minutes):
@@ -166,15 +166,6 @@ def sum_page():
                            total_break=fmt_time(total_break_minutes),
                            total_netto=fmt_time(total_netto_minutes),
                            selected_month=month_str)
-
-if __name__ == '__main__':
-    app.run(debug=True)
-import os
-from flask import Flask
-
-app = Flask(__name__)
-
-# ... dein restlicher Code ...
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
