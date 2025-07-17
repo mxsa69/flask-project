@@ -169,3 +169,13 @@ def sum_page():
 
 if __name__ == '__main__':
     app.run(debug=True)
+import os
+from flask import Flask
+
+app = Flask(__name__)
+
+# ... dein restlicher Code ...
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
